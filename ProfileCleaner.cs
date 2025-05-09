@@ -6,20 +6,12 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using Microsoft.Win32;
+using System.Threading;
 
 namespace CleanupService
 {
     public static class ProfileCleaner
     {
-        // P/Invoke for shell32.dll to empty the recycle bin
-        [DllImport("shell32.dll")]
-        static extern int SHEmptyRecycleBin(IntPtr hwnd, string pszRootPath, uint dwFlags);
-        
-        // Flags for SHEmptyRecycleBin
-        private const uint SHERB_NOCONFIRMATION = 0x00000001;
-        private const uint SHERB_NOPROGRESSUI = 0x00000002;
-        private const uint SHERB_NOSOUND = 0x00000004;
-
         // Configure cleanup settings
         private static readonly string[] SystemTempFolders = new string[]
         {
@@ -206,23 +198,164 @@ namespace CleanupService
             try
             {
                 Logger.LogInfo("Emptying the Recycle Bin for all drives");
-                
-                // Empty all recycle bins (null for pszRootPath means all drives)
-                uint flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
-                int result = SHEmptyRecycleBin(IntPtr.Zero, null, flags);
-                
-                if (result == 0)
+
+                // Method 1: Try using command line (most reliable method from a service)
+                try
                 {
-                    Logger.LogInfo("Recycle Bin emptied successfully");
+                    ProcessStartInfo psi = new ProcessStartInfo();
+                    psi.FileName = "cmd.exe";
+                    psi.Arguments = "/c rd /s /q C:\\$Recycle.Bin";
+                    psi.CreateNoWindow = true;
+                    psi.UseShellExecute = false;
+                    psi.RedirectStandardOutput = true;
+                    psi.RedirectStandardError = true;
+
+                    Logger.LogInfo("Executing command: cmd.exe /c rd /s /q C:\\$Recycle.Bin");
+                    Process process = Process.Start(psi);
+                    
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+                    
+                    process.WaitForExit();
+                    
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        Logger.LogInfo($"Command output: {output}");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        Logger.LogWarning($"Command error: {error}");
+                    }
+                    
+                    Logger.LogInfo($"Recycle Bin emptied with exit code: {process.ExitCode}");
+
+                    // Check other drives too
+                    foreach (DriveInfo drive in DriveInfo.GetDrives())
+                    {
+                        if (drive.DriveType == DriveType.Fixed && 
+                            drive.IsReady && 
+                            drive.RootDirectory.FullName != "C:\\")
+                        {
+                            string recyclePath = Path.Combine(drive.RootDirectory.FullName, "$Recycle.Bin");
+                            
+                            psi.Arguments = $"/c rd /s /q {recyclePath}";
+                            Logger.LogInfo($"Executing command: cmd.exe {psi.Arguments}");
+                            
+                            process = Process.Start(psi);
+                            process.WaitForExit();
+                            
+                            Logger.LogInfo($"Recycle Bin emptied on drive {drive.Name} with exit code: {process.ExitCode}");
+                        }
+                    }
+
+                    Logger.LogInfo("Recycle Bin emptied successfully using command line");
                 }
-                else
+                catch (Exception ex)
                 {
-                    Logger.LogWarning($"Failed to empty Recycle Bin. Error code: {result}");
+                    Logger.LogError($"Error emptying Recycle Bin using command line: {ex.Message}");
+                    
+                    // Method 2: Try using direct folder deletion as backup
+                    try
+                    {
+                        Logger.LogInfo("Attempting alternative method to empty Recycle Bin");
+                        
+                        // Get all drives
+                        foreach (DriveInfo drive in DriveInfo.GetDrives())
+                        {
+                            if (drive.DriveType == DriveType.Fixed && drive.IsReady)
+                            {
+                                string recycleBinPath = Path.Combine(drive.RootDirectory.FullName, "$Recycle.Bin");
+                                
+                                if (Directory.Exists(recycleBinPath))
+                                {
+                                    Logger.LogInfo($"Cleaning Recycle Bin at: {recycleBinPath}");
+                                    
+                                    // Get all subdirectories (each user's recycle bin)
+                                    string[] userBins = Directory.GetDirectories(recycleBinPath);
+                                    
+                                    foreach (string userBin in userBins)
+                                    {
+                                        try
+                                        {
+                                            Logger.LogInfo($"Cleaning user recycle bin: {userBin}");
+                                            
+                                            // Instead of trying to delete the whole folder, delete each file individually
+                                            DeleteRecursive(userBin);
+                                            
+                                            Logger.LogInfo($"Cleaned user recycle bin: {userBin}");
+                                        }
+                                        catch (Exception userEx)
+                                        {
+                                            Logger.LogWarning($"Error cleaning user recycle bin {userBin}: {userEx.Message}");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Logger.LogInfo("Recycle Bin emptied successfully using direct folder deletion");
+                    }
+                    catch (Exception altEx)
+                    {
+                        Logger.LogError($"Error emptying Recycle Bin using alternative method: {altEx.Message}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error emptying Recycle Bin: {ex.Message}");
+                Logger.LogError($"Error in EmptyRecycleBin: {ex.Message}");
+            }
+        }
+
+        private static void DeleteRecursive(string path)
+        {
+            // First, delete all files in this directory
+            try
+            {
+                string[] files = Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly);
+                
+                foreach (string file in files)
+                {
+                    try
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning($"Could not delete file {file}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Error getting files in {path}: {ex.Message}");
+            }
+            
+            // Then, recursively clean all subdirectories
+            try
+            {
+                string[] dirs = Directory.GetDirectories(path, "*", SearchOption.TopDirectoryOnly);
+                
+                foreach (string dir in dirs)
+                {
+                    try
+                    {
+                        DeleteRecursive(dir);
+                        
+                        // Try to remove the now-empty directory
+                        Directory.Delete(dir, false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning($"Could not process directory {dir}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning($"Error getting subdirectories in {path}: {ex.Message}");
             }
         }
 
@@ -585,6 +718,12 @@ namespace CleanupService
                         {
                             Logger.LogInfo($"Skipping locked file: {file}");
                             continue;
+                        }
+                        
+                        // Clear readonly attribute if present
+                        if ((File.GetAttributes(file) & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                        {
+                            File.SetAttributes(file, FileAttributes.Normal);
                         }
                         
                         // Delete the file
