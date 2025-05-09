@@ -87,6 +87,254 @@ namespace CleanupService
             "My Videos"
         };
 
+        public static void CloseConfiguredProcesses()
+        {
+            try
+            {
+                Logger.LogInfo("Closing configured processes from App.config");
+
+                // Get the list of processes to close from config
+                string processesString = System.Configuration.ConfigurationManager.AppSettings["ProcessesToClose"];
+
+                if (string.IsNullOrEmpty(processesString))
+                {
+                    Logger.LogInfo("No processes to close specified in configuration");
+                    return;
+                }
+
+                // Split the comma-separated list
+                string[] processes = processesString.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (processes.Length == 0)
+                {
+                    Logger.LogInfo("No processes to close after splitting configuration");
+                    return;
+                }
+
+                Logger.LogInfo($"Found {processes.Length} processes to close in configuration");
+
+                // Close Office products if specified
+                bool closeOfficeProducts = false;
+                foreach (string process in processes)
+                {
+                    string trimmedProcess = process.Trim().ToLowerInvariant();
+
+                    if (trimmedProcess.Equals("office", StringComparison.OrdinalIgnoreCase))
+                    {
+                        closeOfficeProducts = true;
+                        break;
+                    }
+                }
+
+                if (closeOfficeProducts)
+                {
+                    CloseOfficeProcesses();
+                }
+
+                // Close each specific process
+                foreach (string process in processes)
+                {
+                    string trimmedProcess = process.Trim();
+
+                    // Skip "office" as we've already handled it
+                    if (trimmedProcess.Equals("office", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        Logger.LogInfo($"Closing process: {trimmedProcess}");
+
+                        Process[] runningProcesses = Process.GetProcessesByName(trimmedProcess);
+
+                        if (runningProcesses.Length == 0)
+                        {
+                            Logger.LogInfo($"No instances of {trimmedProcess} found running");
+                            continue;
+                        }
+
+                        Logger.LogInfo($"Found {runningProcesses.Length} instances of {trimmedProcess} running");
+
+                        foreach (Process proc in runningProcesses)
+                        {
+                            try
+                            {
+                                proc.CloseMainWindow();
+
+                                // Give it a moment to close gracefully
+                                if (!proc.WaitForExit(3000))
+                                {
+                                    // If the process hasn't exited after waiting, force kill it
+                                    Logger.LogInfo($"Process {proc.ProcessName} (ID: {proc.Id}) not responding to close request, force killing");
+                                    proc.Kill();
+                                }
+
+                                Logger.LogInfo($"Successfully closed {proc.ProcessName} (ID: {proc.Id})");
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError($"Error closing process {proc.ProcessName} (ID: {proc.Id}): {ex.Message}");
+                            }
+                            finally
+                            {
+                                proc.Dispose();
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error processing configured process {trimmedProcess}: {ex.Message}");
+                    }
+                }
+
+                Logger.LogInfo("Finished closing configured processes");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error in CloseConfiguredProcesses: {ex.Message}");
+            }
+        }
+
+
+        public static void RestartExplorer()
+        {
+            try
+            {
+                Logger.LogInfo("Attempting to restart Windows Explorer");
+
+                // Check if we should restart Explorer based on configuration
+                string restartExplorerSetting = System.Configuration.ConfigurationManager.AppSettings["RestartExplorerOnSessionChange"];
+
+                // Parse the setting value, default to true if missing or invalid
+                bool shouldRestart = true;
+                if (!string.IsNullOrEmpty(restartExplorerSetting))
+                {
+                    bool.TryParse(restartExplorerSetting, out shouldRestart);
+                }
+
+                if (!shouldRestart)
+                {
+                    Logger.LogInfo("Explorer restart disabled in configuration");
+                    return;
+                }
+
+                // Find all explorer processes
+                Process[] explorerProcesses = Process.GetProcessesByName("explorer");
+
+                if (explorerProcesses.Length == 0)
+                {
+                    Logger.LogInfo("No explorer.exe processes found");
+                    return;
+                }
+
+                // Kill all explorer instances
+                Logger.LogInfo($"Found {explorerProcesses.Length} explorer.exe processes, terminating them");
+
+                foreach (Process process in explorerProcesses)
+                {
+                    try
+                    {
+                        process.Kill();
+                        process.WaitForExit(5000);
+                        Logger.LogInfo($"Terminated explorer.exe process (ID: {process.Id})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError($"Error terminating explorer.exe process (ID: {process.Id}): {ex.Message}");
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+
+                // Wait a bit for cleanup
+                Thread.Sleep(1000);
+
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error in RestartExplorer: {ex.Message}");
+            }
+        }
+
+        // This method closes all configured processes from App.config &  Microsoft Office applications
+        private static void CloseOfficeProcesses()
+        {
+            Logger.LogInfo("Closing Microsoft Office applications");
+
+            // List of common Office application process names
+            string[] officeProcessNames = new string[]
+            {
+        "WINWORD",    // Microsoft Word
+        "EXCEL",      // Microsoft Excel
+        "POWERPNT",   // Microsoft PowerPoint
+        "OUTLOOK",    // Microsoft Outlook
+        "ONENOTE",    // Microsoft OneNote
+        "MSACCESS",   // Microsoft Access
+        "MSPUB",      // Microsoft Publisher
+        "VISIO",      // Microsoft Visio
+        "PROJECTPRO", // Microsoft Project
+        "GROOVE",     // Microsoft SharePoint Workspace
+        "INFOPATH",   // Microsoft InfoPath
+        "ONENOTEM",   // Microsoft OneNote Quick Launcher
+        "LYNC",       // Microsoft Lync
+        "SKYPE",      // Skype for Business
+        "TEAMS",      // Microsoft Teams
+        "MSTORE"      // Microsoft Store Office apps
+            };
+
+            foreach (string processName in officeProcessNames)
+            {
+                try
+                {
+                    Process[] processes = Process.GetProcessesByName(processName);
+
+                    if (processes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    Logger.LogInfo($"Found {processes.Length} instances of {processName} running");
+
+                    foreach (Process proc in processes)
+                    {
+                        try
+                        {
+                            // Try to close gracefully first
+                            proc.CloseMainWindow();
+
+                            // Give the application time to save and close
+                            if (!proc.WaitForExit(5000))
+                            {
+                                // If it hasn't closed after 5 seconds, force it to close
+                                Logger.LogInfo($"{processName} not responding to close request, force killing");
+                                proc.Kill();
+                            }
+
+                            Logger.LogInfo($"Successfully closed {processName} (ID: {proc.Id})");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError($"Error closing {processName} (ID: {proc.Id}): {ex.Message}");
+                        }
+                        finally
+                        {
+                            proc.Dispose();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Error processing Office application {processName}: {ex.Message}");
+                }
+            }
+
+            Logger.LogInfo("Finished closing Microsoft Office applications");
+        }
+
+
         // Main cleanup method
         public static void RunCleanup(string triggerSource)
         {

@@ -146,10 +146,11 @@ namespace CleanupService
                 {
                     case SessionChangeReason.SessionLogon:
                         Logger.LogInfo($"Session logon detected (Session ID: {changeDescription.SessionId})");
-                        
+
                         // Run on a background thread to avoid blocking the service
-                        ThreadPool.QueueUserWorkItem(state => {
-                            try 
+                        ThreadPool.QueueUserWorkItem(state =>
+                        {
+                            try
                             {
                                 ProfileCleaner.RunCleanup("User Logon");
                             }
@@ -162,16 +163,54 @@ namespace CleanupService
 
                     case SessionChangeReason.SessionLogoff:
                         Logger.LogInfo($"Session logoff detected (Session ID: {changeDescription.SessionId})");
-                        
+
                         // Run on a background thread to avoid blocking the service
-                        ThreadPool.QueueUserWorkItem(state => {
-                            try 
+                        ThreadPool.QueueUserWorkItem(state =>
+                        {
+                            try
                             {
                                 ProfileCleaner.RunCleanup("User Logoff");
                             }
                             catch (Exception ex)
                             {
                                 Logger.LogError($"Error in logoff cleanup thread: {ex.Message}");
+                            }
+                        });
+                        break;
+
+                    case SessionChangeReason.SessionLock:
+                        Logger.LogInfo($"Session lock detected (Session ID: {changeDescription.SessionId})");
+
+                        // Run on a background thread to avoid blocking the service
+                        ThreadPool.QueueUserWorkItem(state =>
+                        {
+                            try
+                            {
+                                ProfileCleaner.RunCleanup("Session Lock");
+                                ProfileCleaner.CloseConfiguredProcesses(); // Close specified processes on lock
+                                ProfileCleaner.RestartExplorer(); // Restart Explorer 
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError($"Error in session lock cleanup thread: {ex.Message}");
+                            }
+                        });
+                        break;
+
+                    case SessionChangeReason.SessionUnlock:
+                        Logger.LogInfo($"Session unlock detected (Session ID: {changeDescription.SessionId})");
+
+                        // Run on a background thread to avoid blocking the service
+                        ThreadPool.QueueUserWorkItem(state =>
+                        {
+                            try
+                            {
+                                ProfileCleaner.RunCleanup("Session Unlock");
+                                ProfileCleaner.CloseConfiguredProcesses();
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError($"Error in session unlock cleanup thread: {ex.Message}");
                             }
                         });
                         break;
