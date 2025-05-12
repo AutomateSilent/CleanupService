@@ -203,21 +203,21 @@ namespace CleanupService
             {
                 Logger.LogInfo("Attempting to restart Windows Explorer");
 
-                // Check if we should restart Explorer based on configuration
-                string restartExplorerSetting = System.Configuration.ConfigurationManager.AppSettings["RestartExplorerOnSessionChange"];
+                //// Check if we should restart Explorer based on configuration
+                //string restartExplorerSetting = System.Configuration.ConfigurationManager.AppSettings["RestartExplorerOnSessionChange"];
 
-                // Parse the setting value, default to true if missing or invalid
-                bool shouldRestart = true;
-                if (!string.IsNullOrEmpty(restartExplorerSetting))
-                {
-                    bool.TryParse(restartExplorerSetting, out shouldRestart);
-                }
+                //// Parse the setting value, default to true if missing or invalid
+                //bool shouldRestart = true;
+                //if (!string.IsNullOrEmpty(restartExplorerSetting))
+                //{
+                //    bool.TryParse(restartExplorerSetting, out shouldRestart);
+                //}
 
-                if (!shouldRestart)
-                {
-                    Logger.LogInfo("Explorer restart disabled in configuration");
-                    return;
-                }
+                //if (!shouldRestart)
+                //{
+                //    Logger.LogInfo("Explorer restart disabled in configuration");
+                //    return;
+                //}
 
                 // Find all explorer processes
                 Process[] explorerProcesses = Process.GetProcessesByName("explorer");
@@ -236,7 +236,7 @@ namespace CleanupService
                     try
                     {
                         process.Kill();
-                        process.WaitForExit(5000);
+                        process.WaitForExit(2000);
                         Logger.LogInfo($"Terminated explorer.exe process (ID: {process.Id})");
                     }
                     catch (Exception ex)
@@ -282,7 +282,9 @@ namespace CleanupService
         "LYNC",       // Microsoft Lync
         "SKYPE",      // Skype for Business
         "TEAMS",      // Microsoft Teams
-        "MSTORE"      // Microsoft Store Office apps
+        "MSTORE",      // Microsoft Store Office apps
+        "edge",      // Microsoft Edge (if used for Office 365)
+        "msedge" // Microsoft Edge (if used for Office 365)
             };
 
             foreach (string processName in officeProcessNames)
@@ -306,9 +308,9 @@ namespace CleanupService
                             proc.CloseMainWindow();
 
                             // Give the application time to save and close
-                            if (!proc.WaitForExit(5000))
+                            if (!proc.WaitForExit(2000))
                             {
-                                // If it hasn't closed after 5 seconds, force it to close
+                                // If it hasn't closed after 2 seconds, force it to close
                                 Logger.LogInfo($"{processName} not responding to close request, force killing");
                                 proc.Kill();
                             }
