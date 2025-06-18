@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- 
+Kiosk Profile Cleanup Service - Configuration Templates
+Copy the appropriate template below and customize for your environment.
+-->
+<configuration>
+	<startup>
+		<supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8.1" />
+	</startup>
+	
+	<!-- 
+	==============================================
+	TEMPLATE 1: BASIC KIOSK SETUP (RECOMMENDED)
+	==============================================
+	Use this for most single-user kiosk deployments
+	-->
+	<appSettings>
+		<!-- Logging settings -->
+		<add key="LogFolder" value="C:\Logs\ProfileCleanUp" />
+		<add key="MaxLogSizeKB" value="30" />
+
+		<!-- Target only the kiosk user (CHANGE THIS TO YOUR KIOSK USERNAME) -->
+		<add key="TargetProfiles" value="KioskUser" />
+
+		<!-- Force signout on lock for clean sessions -->
+		<add key="ForceSignoutOnLock" value="true" />
+
+		<!-- 15-minute idle timeout (adjust as needed) -->
+		<add key="IdleTimeoutMinutes" value="15" />
+		<add key="EnableIdleSignout" value="true" />
+
+		<!-- Standard cleanup settings -->
+		<add key="CleanTempFolders" value="true" />
+		<add key="CleanBrowserProfiles" value="true" />
+		<add key="CleanUserFolders" value="true" />
+		<add key="CleanDesktop" value="true" />
+		<add key="CleanDocuments" value="true" />
+		<add key="CleanDownloads" value="true" />
+		<add key="CleanPictures" value="true" />
+		<add key="CleanVideos" value="true" />
+		<add key="CleanMusic" value="true" />
+		<add key="ThoroughCleaningOnLogoff" value="true" />
+		<add key="RestartExplorerOnSessionChange" value="false" />
+
+
+	</appSettings>
+</configuration>
+
+<!-- 
+===============================================
+TEMPLATE 2: MULTI-USER TERMINAL SETUP
+===============================================
+Use this for shared terminals with multiple users
+
+<appSettings>
+	<add key="LogFolder" value="C:\Logs\ProfileCleanUp" />
+	<add key="MaxLogSizeKB" value="30" />
+
+	Target multiple terminal users (CHANGE THESE TO YOUR USERNAMES)
+	<add key="TargetProfiles" value="Terminal1,Terminal2,Terminal3,GuestUser" />
+
+	Force signout on lock
+	<add key="ForceSignoutOnLock" value="true" />
+
+	10-minute idle timeout for high-traffic areas
+	<add key="IdleTimeoutMinutes" value="10" />
+	<add key="EnableIdleSignout" value="true" />
+
+	Aggressive cleanup
+	<add key="CleanTempFolders" value="true" />
+	<add key="CleanBrowserProfiles" value="true" />
+	<add key="CleanUserFolders" value="true" />
+	<add key="CleanDesktop" value="true" />
+	<add key="CleanDocuments" value="true" />
+	<add key="CleanDownloads" value="true" />
+	<add key="CleanPictures" value="true" />
+	<add key="CleanVideos" value="true" />
+	<add key="CleanMusic" value="true" />
+	<add key="ThoroughCleaningOnLogoff" value="true" />
+	<add key="RestartExplorerOnSessionChange" value="false" />
+
+
+</appSettings>
+-->
+
+<!-- 
+===============================================
+TEMPLATE 3: CONSERVATIVE SETUP (MINIMAL DISRUPTION)
+===============================================
+Use this to maintain backward compatibility with minimal changes
+
+<appSettings>
+	<add key="LogFolder" value="C:\Logs\ProfileCleanUp" />
+	<add key="MaxLogSizeKB" value="30" />
+
+	Clean all profiles (original behavior)
+	<add key="TargetProfiles" value="" />
+
+	Traditional lock behavior (cleanup instead of signout)
+	<add key="ForceSignoutOnLock" value="false" />
+
+	No idle timeout
+	<add key="EnableIdleSignout" value="false" />
+
+	Basic cleanup only
+	<add key="CleanTempFolders" value="true" />
+	<add key="CleanBrowserProfiles" value="false" />
+	<add key="CleanUserFolders" value="false" />
+	<add key="CleanDesktop" value="false" />
+	<add key="CleanDocuments" value="false" />
+	<add key="CleanDownloads" value="false" />
+	<add key="CleanPictures" value="false" />
+	<add key="CleanVideos" value="false" />
+	<add key="CleanMusic" value="false" />
+	<add key="ThoroughCleaningOnLogoff" value="false" />
+	<add key="RestartExplorerOnSessionChange" value="false" />
+
+
+</appSettings>
+-->
+
+<!-- 
+===============================================
+TEMPLATE 4: HIGH-SECURITY KIOSK
+===============================================
+Use this for kiosks in public areas requiring maximum security
+
+<appSettings>
+	<add key="LogFolder" value="C:\Logs\ProfileCleanUp" />
+	<add key="MaxLogSizeKB" value="30" />
+
+	Target only the kiosk user (CHANGE THIS TO YOUR KIOSK USERNAME)
+	<add key="TargetProfiles" value="PublicKiosk" />
+
+	Force signout on lock
+	<add key="ForceSignoutOnLock" value="true" />
+
+	Short 5-minute idle timeout for maximum security
+	<add key="IdleTimeoutMinutes" value="5" />
+	<add key="EnableIdleSignout" value="true" />
+
+	Maximum cleanup
+	<add key="CleanTempFolders" value="true" />
+	<add key="CleanBrowserProfiles" value="true" />
+	<add key="CleanUserFolders" value="true" />
+	<add key="CleanDesktop" value="true" />
+	<add key="CleanDocuments" value="true" />
+	<add key="CleanDownloads" value="true" />
+	<add key="CleanPictures" value="true" />
+	<add key="CleanVideos" value="true" />
+	<add key="CleanMusic" value="true" />
+	<add key="ThoroughCleaningOnLogoff" value="true" />
+	<add key="RestartExplorerOnSessionChange" value="false" />
+
+
+</appSettings>
+-->
+
+<!-- 
+===============================================
+TEMPLATE 5: DEVELOPMENT/TESTING SETUP
+===============================================
+Use this for testing new configurations safely
+
+<appSettings>
+	<add key="LogFolder" value="C:\Logs\ProfileCleanUp" />
+	<add key="MaxLogSizeKB" value="100" />
+
+	Target test user only (CHANGE THIS TO YOUR TEST USERNAME)
+	<add key="TargetProfiles" value="TestUser" />
+
+	Traditional lock behavior for testing
+	<add key="ForceSignoutOnLock" value="false" />
+
+	Short timeout for testing (2 minutes)
+	<add key="IdleTimeoutMinutes" value="2" />
+	<add key="EnableIdleSignout" value="true" />
+
+	Minimal cleanup for testing
+	<add key="CleanTempFolders" value="true" />
+	<add key="CleanBrowserProfiles" value="false" />
+	<add key="CleanUserFolders" value="false" />
+	<add key="CleanDesktop" value="true" />
+	<add key="CleanDocuments" value="false" />
+	<add key="CleanDownloads" value="true" />
+	<add key="CleanPictures" value="false" />
+	<add key="CleanVideos" value="false" />
+	<add key="CleanMusic" value="false" />
+	<add key="ThoroughCleaningOnLogoff" value="false" />
+	<add key="RestartExplorerOnSessionChange" value="false" />
+
+
+</appSettings>
+-->
+
+<!-- 
+===============================================
+QUICK REFERENCE FOR COMMON SETTINGS
+===============================================
+
+Profile Targeting:
+- Single user: <add key="TargetProfiles" value="KioskUser" />
+- Multiple users: <add key="TargetProfiles" value="User1,User2,User3" />
+- All users: <add key="TargetProfiles" value="" />
+
+Idle Timeout:
+- 5 minutes: <add key="IdleTimeoutMinutes" value="5" />
+- 10 minutes: <add key="IdleTimeoutMinutes" value="10" />
+- 15 minutes: <add key="IdleTimeoutMinutes" value="15" />
+- 30 minutes: <add key="IdleTimeoutMinutes" value="30" />
+- Disabled: <add key="EnableIdleSignout" value="false" />
+
+Lock Behavior:
+- Force signout on lock (recommended): <add key="ForceSignoutOnLock" value="true" />
+- Traditional cleanup on lock: <add key="ForceSignoutOnLock" value="false" />
+
+
+-->

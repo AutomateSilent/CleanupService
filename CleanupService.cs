@@ -93,6 +93,9 @@ namespace CleanupService
                     {
                         ProfileCleaner.RunCleanup("System Startup");
                         Logger.LogInfo("Startup cleanup completed");
+                        
+                        // Execute startup scripts
+                        ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Startup);
                     }
                     catch (Exception ex)
                     {
@@ -153,6 +156,9 @@ namespace CleanupService
                             try
                             {
                                 ProfileCleaner.RunCleanup("User Logon");
+                                
+                                // Execute logon scripts
+                                ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Logon, changeDescription.SessionId);
                             }
                             catch (Exception ex)
                             {
@@ -170,6 +176,9 @@ namespace CleanupService
                             try
                             {
                                 ProfileCleaner.RunCleanup("User Logoff");
+                                
+                                // Execute logoff scripts
+                                ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Logoff, changeDescription.SessionId);
                             }
                             catch (Exception ex)
                             {
@@ -182,19 +191,22 @@ namespace CleanupService
                         Logger.LogInfo($"Session lock detected (Session ID: {changeDescription.SessionId})");
 
                         // Run on a background thread to avoid blocking the service
-                        ThreadPool.QueueUserWorkItem(state =>
-                        {
-                            try
+                            ThreadPool.QueueUserWorkItem(state =>
                             {
-                                ProfileCleaner.RunCleanup("Session Lock");
+                                try
+                                {
+                                    ProfileCleaner.RunCleanup("Session Lock");
                                 ProfileCleaner.CloseConfiguredProcesses(); // Close specified processes on lock
                                 ProfileCleaner.RestartExplorer(); // Restart Explorer 
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.LogError($"Error in session lock cleanup thread: {ex.Message}");
-                            }
-                        });
+                                
+                                // Execute lock scripts
+                                ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Lock, changeDescription.SessionId); 
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.LogError($"Error in session lock cleanup thread: {ex.Message}");
+                                }
+                            });
                         break;
 
                     case SessionChangeReason.SessionUnlock:
@@ -206,7 +218,10 @@ namespace CleanupService
                             try
                             {
                                 ProfileCleaner.RunCleanup("Session Unlock");
-                                ProfileCleaner.CloseConfiguredProcesses();
+                                //ProfileCleaner.CloseConfiguredProcesses();
+                                
+                                // Execute unlock scripts
+                                ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Unlock, changeDescription.SessionId);
                             }
                             catch (Exception ex)
                             {
@@ -241,6 +256,9 @@ namespace CleanupService
                         try 
                         {
                             ProfileCleaner.RunCleanup("Resume From Sleep");
+                            
+                            // Execute resume scripts
+                            ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Resume);
                         }
                         catch (Exception ex)
                         {
@@ -266,6 +284,9 @@ namespace CleanupService
                 // Run a quick cleanup on shutdown if needed - in this case we can run synchronously
                 // since the system is shutting down anyway
                 ProfileCleaner.RunCleanup("System Shutdown");
+                
+                // Execute shutdown scripts
+                ScriptRunner.RunScriptsForEvent(ScriptRunner.SessionEvent.Shutdown);
                 
                 Logger.LogInfo("Shutdown cleanup completed");
             }

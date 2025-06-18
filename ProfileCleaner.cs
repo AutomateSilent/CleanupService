@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -86,7 +87,6 @@ namespace CleanupService
             "My Pictures",
             "My Videos"
         };
-
         public static void CloseConfiguredProcesses()
         {
             try
@@ -114,22 +114,22 @@ namespace CleanupService
                 Logger.LogInfo($"Found {processes.Length} processes to close in configuration");
 
                 // Close Office products if specified
-                bool closeOfficeProducts = false;
-                foreach (string process in processes)
-                {
-                    string trimmedProcess = process.Trim().ToLowerInvariant();
+                //bool closeOfficeProducts = false;
+                //foreach (string process in processes)
+                //{
+                //    string trimmedProcess = process.Trim().ToLowerInvariant();
 
-                    if (trimmedProcess.Equals("office", StringComparison.OrdinalIgnoreCase))
-                    {
-                        closeOfficeProducts = true;
-                        break;
-                    }
-                }
+                //    if (trimmedProcess.Equals("office", StringComparison.OrdinalIgnoreCase))
+                //    {
+                //        closeOfficeProducts = true;
+                //        break;
+                //    }
+                //}
 
-                if (closeOfficeProducts)
-                {
-                    CloseOfficeProcesses();
-                }
+                //if (closeOfficeProducts)
+                //{
+                //    CloseOfficeProcesses();
+                //}
 
                 // Close each specific process
                 foreach (string process in processes)
@@ -203,22 +203,6 @@ namespace CleanupService
             {
                 Logger.LogInfo("Attempting to restart Windows Explorer");
 
-                //// Check if we should restart Explorer based on configuration
-                //string restartExplorerSetting = System.Configuration.ConfigurationManager.AppSettings["RestartExplorerOnSessionChange"];
-
-                //// Parse the setting value, default to true if missing or invalid
-                //bool shouldRestart = true;
-                //if (!string.IsNullOrEmpty(restartExplorerSetting))
-                //{
-                //    bool.TryParse(restartExplorerSetting, out shouldRestart);
-                //}
-
-                //if (!shouldRestart)
-                //{
-                //    Logger.LogInfo("Explorer restart disabled in configuration");
-                //    return;
-                //}
-
                 // Find all explorer processes
                 Process[] explorerProcesses = Process.GetProcessesByName("explorer");
 
@@ -259,82 +243,6 @@ namespace CleanupService
             }
         }
 
-        // This method closes all configured processes from App.config &  Microsoft Office applications
-        private static void CloseOfficeProcesses()
-        {
-            Logger.LogInfo("Closing Microsoft Office applications");
-
-            // List of common Office application process names
-            string[] officeProcessNames = new string[]
-            {
-        "WINWORD",    // Microsoft Word
-        "EXCEL",      // Microsoft Excel
-        "POWERPNT",   // Microsoft PowerPoint
-        "OUTLOOK",    // Microsoft Outlook
-        "ONENOTE",    // Microsoft OneNote
-        "MSACCESS",   // Microsoft Access
-        "MSPUB",      // Microsoft Publisher
-        "VISIO",      // Microsoft Visio
-        "PROJECTPRO", // Microsoft Project
-        "GROOVE",     // Microsoft SharePoint Workspace
-        "INFOPATH",   // Microsoft InfoPath
-        "ONENOTEM",   // Microsoft OneNote Quick Launcher
-        "LYNC",       // Microsoft Lync
-        "SKYPE",      // Skype for Business
-        "TEAMS",      // Microsoft Teams
-        "MSTORE",      // Microsoft Store Office apps
-        "edge",      // Microsoft Edge (if used for Office 365)
-        "msedge" // Microsoft Edge (if used for Office 365)
-            };
-
-            foreach (string processName in officeProcessNames)
-            {
-                try
-                {
-                    Process[] processes = Process.GetProcessesByName(processName);
-
-                    if (processes.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    Logger.LogInfo($"Found {processes.Length} instances of {processName} running");
-
-                    foreach (Process proc in processes)
-                    {
-                        try
-                        {
-                            // Try to close gracefully first
-                            proc.CloseMainWindow();
-
-                            // Give the application time to save and close
-                            if (!proc.WaitForExit(2000))
-                            {
-                                // If it hasn't closed after 2 seconds, force it to close
-                                Logger.LogInfo($"{processName} not responding to close request, force killing");
-                                proc.Kill();
-                            }
-
-                            Logger.LogInfo($"Successfully closed {processName} (ID: {proc.Id})");
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError($"Error closing {processName} (ID: {proc.Id}): {ex.Message}");
-                        }
-                        finally
-                        {
-                            proc.Dispose();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError($"Error processing Office application {processName}: {ex.Message}");
-                }
-            }
-
-            Logger.LogInfo("Finished closing Microsoft Office applications");
-        }
 
 
         // Main cleanup method
@@ -633,8 +541,8 @@ namespace CleanupService
 
         private static void CleanAllUserProfiles(bool thorough)
         {
-            // Get all user profiles
-            List<string> userProfiles = GetAllUserProfiles();
+            // Get user profiles based on configuration
+            List<string> userProfiles = GetTargetUserProfiles();
             Logger.LogInfo($"Found {userProfiles.Count} user profiles to clean");
             
             foreach (string userProfile in userProfiles)
@@ -682,7 +590,7 @@ namespace CleanupService
 
         private static void CleanAllUserBrowserCaches()
         {
-            List<string> userProfiles = GetAllUserProfiles();
+            List<string> userProfiles = GetTargetUserProfiles();
             Logger.LogInfo($"Cleaning browser caches for {userProfiles.Count} user profiles");
             
             foreach (string userProfile in userProfiles)
@@ -845,6 +753,85 @@ namespace CleanupService
         #endregion
 
         #region Helper Methods
+
+        private static List<string> GetTargetUserProfiles()
+        {
+            List<string> targetProfiles = new List<string>();
+            
+            try
+            {
+                // Get the target profiles from configuration
+                string targetProfilesConfig = ConfigurationManager.AppSettings["TargetProfiles"];
+                
+                if (string.IsNullOrEmpty(targetProfilesConfig) || targetProfilesConfig.Trim() == "")
+                {
+                    // No specific profiles configured, return all profiles (original behavior)
+                    Logger.LogInfo("No target profiles specified in config - cleaning all user profiles");
+                    return GetAllUserProfiles();
+                }
+                
+                // Parse the comma-separated list of target profiles
+                string[] configuredProfiles = targetProfilesConfig.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                
+                if (configuredProfiles.Length == 0)
+                {
+                    Logger.LogInfo("Empty target profiles list - cleaning all user profiles");
+                    return GetAllUserProfiles();
+                }
+                
+                Logger.LogInfo($"Target profiles configured: {string.Join(", ", configuredProfiles.Select(p => p.Trim()))}");
+                
+                // Get all available user profiles
+                List<string> allProfiles = GetAllUserProfiles();
+                
+                // Filter to only include the configured target profiles
+                foreach (string configuredProfile in configuredProfiles)
+                {
+                    string trimmedProfile = configuredProfile.Trim();
+                    
+                    // Find matching profile path
+                    foreach (string profilePath in allProfiles)
+                    {
+                        string profileName = Path.GetFileName(profilePath);
+                        
+                        if (profileName.Equals(trimmedProfile, StringComparison.OrdinalIgnoreCase))
+                        {
+                            targetProfiles.Add(profilePath);
+                            Logger.LogInfo($"Added target profile for cleanup: {profileName} at {profilePath}");
+                            break;
+                        }
+                    }
+                }
+                
+                // Log any configured profiles that were not found
+                foreach (string configuredProfile in configuredProfiles)
+                {
+                    string trimmedProfile = configuredProfile.Trim();
+                    bool found = targetProfiles.Any(p => Path.GetFileName(p).Equals(trimmedProfile, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (!found)
+                    {
+                        Logger.LogWarning($"Configured target profile not found: {trimmedProfile}");
+                    }
+                }
+                
+                if (targetProfiles.Count == 0)
+                {
+                    Logger.LogWarning("No target profiles found matching configuration - falling back to all profiles");
+                    return GetAllUserProfiles();
+                }
+                
+                Logger.LogInfo($"Successfully identified {targetProfiles.Count} target profiles for cleanup");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"Error getting target user profiles: {ex.Message}");
+                Logger.LogInfo("Falling back to cleaning all user profiles");
+                return GetAllUserProfiles();
+            }
+            
+            return targetProfiles;
+        }
 
         private static List<string> GetAllUserProfiles()
         {
